@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func writeString(conn net.Conn, message string) (int, error) {
@@ -15,28 +17,62 @@ func writeString(conn net.Conn, message string) (int, error) {
 	}
 	return n, nil
 }
+
+func handleCommand(command string) (string, error) {
+	var response string
+	if command == "PING" {
+		response = "PONG"
+	} else {
+		response = ""
+	}
+	return response, nil
+}
+func handleConnection(l net.Listener) error {
+	var err error
+
+	conn, err := l.Accept()
+	if err != nil {
+		fmt.Println("Error accepting connection: ", err.Error())
+		return err
+	}
+	scanner := bufio.NewScanner(conn)
+	for {
+		ok := scanner.Scan()
+		if !ok {
+			break
+		}
+		command := scanner.Text()
+		fmt.Printf("read command [%s]\n", command)
+		firstCharacter := command[0:1]
+		// * is for arrays and $ is for bulk strings
+		// we can ignore both for now and respond only to commands
+		if firstCharacter == "*" || firstCharacter == "$" {
+			continue
+		}
+		response, err := handleCommand(strings.ToUpper(command))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("sending response [%s]\n", response)
+		_, writeErr := writeString(conn, response)
+		if writeErr != nil {
+			return writeErr
+		}
+	}
+	return nil
+
+}
 func main() {
-	fmt.Println("Logs from your program will appear here!")
 
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 	if err != nil {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
-	conn, err := l.Accept()
+
+	err = handleConnection(l)
 	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
+		fmt.Println("Error handling connection", err.Error())
 		os.Exit(1)
-	}
-
-	buf := make([]byte, 0, 4096)
-	_, err = conn.Read(buf)
-	if err != nil {
-		fmt.Println("Error reading from the connection", err.Error())
-	}
-	_, writeErr := writeString(conn, "PONG")
-
-	if writeErr != nil {
-		fmt.Println("Write error", writeErr)
 	}
 }
