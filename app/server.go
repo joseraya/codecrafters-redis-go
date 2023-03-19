@@ -9,30 +9,26 @@ import (
 )
 
 func handleConnection(conn net.Conn) error {
-
 	scanner := bufio.NewScanner(conn)
-	for {
-		ok := scanner.Scan()
-		if !ok {
-			break
-		}
-		request, err := ReadRequest(scanner)
-		if err != nil {
-			return err
+	var err error = nil
+	for scanner.Scan() && err == nil {
+		request := ReadRequest(scanner.Text())
+		if request == "" {
+			continue
 		}
 		fmt.Printf("read request [%s]\n", request)
-		response, err := HandleCommand(strings.ToUpper(request))
-		if err != nil {
-			return err
-		}
-		fmt.Printf("sending response [%s]\n", response)
-		_, writeErr := WriteResponse(conn, response)
-		if writeErr != nil {
-			return writeErr
+
+		response := HandleCommand(strings.ToUpper(request))
+
+		if response != "" {
+			fmt.Printf("sending response [%s]\n", response)
+			_, err := conn.Write([]byte(FormatResonse(response)))
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return nil
-
+	return scanner.Err()
 }
 
 func initialize() net.Listener {
