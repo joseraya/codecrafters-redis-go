@@ -5,30 +5,18 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 )
 
-func handleConnection(conn net.Conn) error {
-	scanner := bufio.NewScanner(conn)
-	var err error = nil
-	for scanner.Scan() && err == nil {
-		request := ReadRequest(scanner.Text())
-		if request == "" {
-			continue
+func main() {
+	listener := initialize()
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(-2)
 		}
-		fmt.Printf("read request [%s]\n", request)
-
-		response := HandleCommand(strings.ToUpper(request))
-
-		if response != "" {
-			fmt.Printf("sending response [%s]\n", response)
-			_, err := conn.Write([]byte(FormatResonse(response)))
-			if err != nil {
-				return err
-			}
-		}
+		go handleConnection(conn)
 	}
-	return scanner.Err()
 }
 
 func initialize() net.Listener {
@@ -40,14 +28,26 @@ func initialize() net.Listener {
 	return l
 }
 
-func main() {
-	listener := initialize()
+func handleConnection(conn net.Conn) error {
+	scanner := bufio.NewScanner(conn)
+
 	for {
-		conn, err := listener.Accept()
+		request, err := ReadStrings(scanner)
 		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			os.Exit(-2)
+			return err
 		}
-		go handleConnection(conn)
+		fmt.Printf("read request %s\n", request)
+
+		response := HandleCommand(request)
+
+		fmt.Printf("write response %s\n", response)
+		if len(response) > 0 {
+			for _, line := range response {
+				_, err := conn.Write([]byte(EncodeValue(line)))
+				if err != nil {
+					return err
+				}
+			}
+		}
 	}
 }
