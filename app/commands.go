@@ -1,15 +1,22 @@
 package main
 
 import (
+	"strconv"
 	"strings"
+	"time"
 )
+
+type entry struct {
+	value   string
+	expires int64
+}
 
 // This is not thread safe. Probably would break in a real-life
 // scenario. We should probably be using https://pkg.go.dev/sync#Map instead
-var values map[string]string
+var values map[string]entry
 
 func init() {
-	values = map[string]string{}
+	values = map[string]entry{}
 }
 
 func HandleCommand(request []string) []string {
@@ -48,12 +55,29 @@ func command(args []string) []string {
 func set(args []string) []string {
 	key := args[0]
 	value := args[1]
-	values[key] = value
+	var expires int64 = 0
+	if len(args) > 2 && strings.ToUpper(args[2]) == "PX" {
+		expiryMs, err := strconv.Atoi(args[3])
+		if err != nil {
+			return nil
+		}
+		expires = time.Now().UnixMilli() + int64(expiryMs)
+	}
+	values[key] = entry{
+		value:   value,
+		expires: expires,
+	}
 	return []string{"OK"}
 }
 
 func get(args []string) []string {
 	key := args[0]
 	value := values[key]
-	return []string{value}
+	now := time.Now().UnixMilli()
+	if value.expires != 0 && now >= value.expires {
+		delete(values, key)
+		return []string{}
+	} else {
+		return []string{value.value}
+	}
 }

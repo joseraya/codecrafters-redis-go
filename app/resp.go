@@ -53,3 +53,7 @@ func EncodeValue(message string) string {
 	msg := fmt.Sprintf("+%s\r\n", message)
 	return msg
 }
+
+func NullString() string {
+	return "$-1\r\n"
+}

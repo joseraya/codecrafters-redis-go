@@ -48,6 +48,11 @@ func handleConnection(conn net.Conn) error {
 					return err
 				}
 			}
+		} else {
+			_, err := conn.Write([]byte(NullString()))
+			if err != nil {
+				return err
+			}
 		}
 	}
 }
